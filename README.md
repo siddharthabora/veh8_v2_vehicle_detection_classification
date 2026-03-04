@@ -1,197 +1,343 @@
+```markdown
+# Veh8-v2: Vehicle Detection, Tracking and Traffic Counting System
 
-# Veh8-v2: Real-Time Multi-Class Vehicle Detection (YOLOv8)
+A modular computer vision pipeline for **real-time vehicle detection, tracking, and line-cross traffic analytics** built on a custom YOLOv8 model and designed for **edge deployment and smart-city traffic monitoring**.
 
-High-performance 8-class vehicle detection model optimized for real-time inference and Android edge deployment.
+The project demonstrates the full lifecycle of a CV system:
 
----
+```
 
-## Overview
+video → detection → tracking → counting → analytics
 
-**Veh8-v2** is a YOLOv8s-based object detection model trained on a hybrid dataset combining structured and chaotic traffic environments. It is optimized for:
-
-- Indian mixed-traffic conditions  
-- Real-time vehicle analytics  
-- On-device inference using TFLite  
-- Vehicle counting and smart traffic applications  
+````
 
 ---
 
-## Model Architecture
+# System Pipeline
 
-- **Base Model:** YOLOv8s  
-- **Parameters:** 11.13M  
-- **GFLOPs:** 28.5  
-- **Input Size:** 640×640  
-- **Classes:** 8  
-- **Framework:** Ultralytics YOLOv8  
+This repository implements a modular pipeline that converts raw video streams into structured traffic events.
+
+```mermaid
+flowchart TD
+
+A[Input Video or Camera Stream] --> B[Frame Decoder OpenCV]
+
+B --> C[YOLOv8 Vehicle Detector]
+
+C --> D[Frame Detections Bounding Boxes Class Confidence]
+
+D --> E[Tracking Layer Minimal Centroid Tracker]
+
+E --> F[Tracklets Vehicle Centroid Trajectories]
+
+F --> G[Line Crossing Event Detection]
+
+G --> H[Outputs]
+
+H --> H1[Class Wise Vehicle Counts]
+
+H --> H2[Crossing Event Log CSV]
+
+H --> H3[Annotated Debug Video]
+````
 
 ---
 
-## Class Definitions
+# Project Goals
 
-| ID | Class |
-|----|----------------------|
-| 0  | auto |
-| 1  | bus |
-| 2  | car |
+This project was built to explore:
+
+* Training a **custom multi-class vehicle detection model**
+* Evaluating **tracking algorithms under dense traffic**
+* Designing a **lightweight event-based counting system**
+* Building a **modular computer vision architecture**
+* Preparing the pipeline for **Android edge deployment**
+
+---
+
+# Model Overview
+
+Veh8-v2 is a YOLOv8s-based object detection model trained on a hybrid dataset combining structured highway traffic and chaotic urban environments.
+
+**Base model**
+
+* YOLOv8s
+* 11.13M parameters
+* 28.5 GFLOPs
+* Input size: 640×640
+* 8 vehicle classes
+
+---
+
+# Vehicle Classes
+
+| ID | Class               |
+| -- | ------------------- |
+| 0  | auto                |
+| 1  | bus                 |
+| 2  | car                 |
 | 3  | light_motor_vehicle |
-| 4  | motorcycle |
-| 5  | multi-axle |
-| 6  | tractor |
-| 7  | truck |
+| 4  | motorcycle          |
+| 5  | multi-axle          |
+| 6  | tractor             |
+| 7  | truck               |
 
 ---
-## Dataset Sources
 
-1. Vehicle Detection 8 Classes | Object Detection
-  - Link: https://www.kaggle.com/datasets/sakshamjn/vehicle-detection-8-classes-object-detection
-  - License: Unknown
-  - Used: 6547 CCTV images filtered for vehicle classes
+# Dataset Sources
 
-2. Indian Driving Dataset-Detections (YOLOv11)
-  - Link: https://www.kaggle.com/datasets/redzapdos123/indian-driving-dataset-detections-yolov11
-  - License: CC BY-NC-SA 4.0
-  - Used: 7000 images filtered for vehicle classes
+Training data was assembled from multiple datasets to capture diverse traffic patterns.
 
-3. BDD100K Detection Dataset
-  - Link: https://bdd-data.berkeley.edu
-  - License: https://doc.bdd100k.com/license.html#license
-  - Used: 602 images filtered for vehicle classes and used to train v1. So BDD knowledge exists in weights in this model, but was not actively retrained.
+### Veh8 Dataset
 
-## Dataset Composition (Training)
+* 6,574 CCTV images
+* Primary training dataset
 
-| Dataset | Images Used |
-|----------|------------|
-| Veh8 (Primary) | 6,574 |
-| IDD (Indian Driving Dataset) | 7,000 |
-| BDD100K | Used in initial checkpoint |
-| **Total (v2)** | **13,574 images** |
+### Indian Driving Dataset (IDD)
+
+* 7,000 filtered vehicle images
+* Chaotic urban driving scenes
+
+### BDD100K
+
+* Used in initial checkpoint
+* Provides broader driving context
+
+**Total training images**
+
+```
+13,574 images
+```
 
 Validation:
-- 821 images  
-- 2,632 labeled instances  
+
+```
+821 images
+2,632 labeled instances
+```
 
 ---
 
-## Validation Performance
+# Validation Performance
 
-### Per-Class mAP@0.5
+### Per-class mAP@0.5
 
-| Class | AP@0.5 |
-|-----------------------|-------:|
-| auto | 0.968 |
-| bus | 0.897 |
-| car | 0.942 |
+| Class               | AP    |
+| ------------------- | ----- |
+| auto                | 0.968 |
+| bus                 | 0.897 |
+| car                 | 0.942 |
 | light_motor_vehicle | 0.791 |
-| motorcycle | 0.884 |
-| multi-axle | 0.855 |
-| tractor | 0.960 |
-| truck | 0.787 |
+| motorcycle          | 0.884 |
+| multi-axle          | 0.855 |
+| tractor             | 0.960 |
+| truck               | 0.787 |
 
----
+### Aggregate metrics
 
-### Aggregate Metrics
-
-| Metric | Value |
-|---------------|------:|
-| Precision | 0.829 |
-| Recall | 0.833 |
-| mAP@0.5 | 0.886 |
+| Metric       | Value |
+| ------------ | ----- |
+| Precision    | 0.829 |
+| Recall       | 0.833 |
+| mAP@0.5      | 0.886 |
 | mAP@0.5:0.95 | 0.684 |
 
-Improvement from previous baseline:
-mAP@0.5:0.95 increased from ~0.64 → **0.684**
-
 ---
 
-## Inference Performance
+# Tracking Experiments
 
-### GPU Benchmark (Tesla T4)
+The project evaluated multiple tracking approaches to determine the most stable method for line-cross counting.
 
-| Stage | Latency |
-|-------------|--------:|
-| Preprocess | 0.2 ms |
-| Inference | 5.4 ms |
-| Postprocess | 1.4 ms |
-| **Total** | ~7.0 ms |
+```mermaid
+flowchart TD
 
-Estimated throughput: ~142 FPS (theoretical GPU batch=1)
+A[YOLO Detection Output] --> B[Experiment ByteTrack]
 
----
+A --> C[Experiment DeepSORT]
 
-## TFLite Deployment (Android)
+A --> D[Experiment Minimal Centroid Tracker]
 
-| Model Variant | Approx Size | Est. CPU Latency | Est. FPS |
-|-----------------------|------------|-----------------:|---------:|
-| Float32 TFLite | ~44 MB | 45–70 ms | 14–22 FPS |
-| Float16 TFLite | ~22 MB | 30–50 ms | 20–33 FPS |
+B --> E[Observation ID fragmentation in dense traffic]
 
-Actual device performance depends on chipset, NNAPI/GPU delegate usage, thermal throttling, and camera pipeline overhead.
+C --> F[Observation Track explosion high compute]
 
----
+D --> G[Observation Stable near counting line lightweight]
 
-## Use Cases
+E --> H[Rejected]
 
-- Real-time vehicle counting  
-- Traffic flow analytics  
-- Line-crossing vehicle tracking  
-- Smart city deployments  
-- Edge-based inference systems  
-- Mobile AI applications  
+F --> H
 
----
-
-## Inference Example
-
-```python
-from ultralytics import YOLO
-
-model = YOLO("best_veh8+bdd100k+idd_v2.1.pt") 
-
-results = model.predict(
-    source="video.mp4",         #Replace with your actual test video
-    imgsz=640,
-    conf=0.30,                  #Choose a hgher conf for lower ghost boxes
-    save=True
-)
+G --> I[Selected for counting pipeline]
 ```
 
-The exported `.pt` model can be loaded and executed in any Python notebook environment (Kaggle, Colab, or local Jupyter) with:
+### Conclusion
 
-```bash
-pip install ultralytics
+For the traffic counting use-case:
+
+**Minimal centroid tracking performed best** because:
+
+* counting requires **stable short-term identity**, not long-term tracking
+* algorithm is **lightweight**
+* robust near the **counting line region**
+
+---
+
+# Traffic Counting System
+
+Vehicles are counted when their **centroid crosses a configurable line** in the frame.
+
+Features:
+
+* resolution-independent line definition
+* configurable direction (top-to-bottom etc.)
+* event logging for analytics
+* robust to moderate occlusion
+
+Outputs include:
+
+```
+vehicle counts
+crossing event CSV logs
+annotated debug videos
 ```
 
 ---
 
-## Limitations
+# Repository Structure
 
-- Motorcycle detection at strict IoU remains comparatively weaker  
-- Tracking-based counting may double-count under occlusion  
-- Low-light robustness not explicitly optimized  
-- Domain shift possible in non-Indian traffic environments  
+```
+src/
+  detection/      YOLO detector wrapper
+  tracking/       tracking algorithms
+  counting/       line crossing logic
+  geometry/       frame geometry utilities
+  evaluation/     event logger and visualization
+  utils/          shared utilities
+
+scripts/
+  count_video.py
+  render_annotated_video.py
+
+configs/
+  tracker.yaml
+  counter.yaml
+
+models/
+  trained YOLO weights
+
+outputs/
+  generated videos and event logs
+
+docs/
+  dataset details
+  training pipeline
+  model card
+  experiments and architecture
+```
 
 ---
 
-## Ethical Considerations
+# Running the Counting Pipeline
 
-- Detects vehicle categories only  
-- No facial recognition  
-- Suitable for non-invasive traffic analytics  
-- Edge deployment reduces privacy exposure  
+Example:
+
+```
+python scripts/count_video.py \
+--video input_video.mp4 \
+--model models/best_veh8bdd100kidd_v2.1.pt
+```
+
+This will produce:
+
+```
+class-wise counts
+event logs
+```
 
 ---
 
-## =Roadmap
+# Generating an Annotated Debug Video
 
-- Direction-based line crossing analytics  
-- Improved motorcycle performance  
-- Low-light data augmentation  
-- Quantized edge-optimized variants  
-- Production Android integration  
+```
+python scripts/render_annotated_video.py \
+--video input_video.mp4 \
+--model models/best_veh8bdd100kidd_v2.1.pt
+```
+
+Output:
+
+```
+outputs/annotated_output.mp4
+```
+
+The video includes:
+
+* bounding boxes
+* class labels
+* confidence scores
+* counting line
+* live counts
 
 ---
 
-## License
+# Edge Deployment
 
-MIT
+The model has also been exported to **TensorFlow Lite** for on-device inference.
+
+| Model          | Size   | Estimated CPU FPS |
+| -------------- | ------ | ----------------- |
+| Float32 TFLite | ~44 MB | 14–22 FPS         |
+| Float16 TFLite | ~22 MB | 20–33 FPS         |
+
+Actual performance depends on device chipset, GPU delegate, and thermal constraints.
+
+---
+
+# Use Cases
+
+* Traffic flow analytics
+* Vehicle counting
+* Smart city infrastructure
+* Edge AI traffic monitoring
+* Urban congestion studies
+
+---
+
+# Limitations
+
+* Motorcycle detection remains slightly weaker at strict IoU
+* Heavy occlusion may fragment tracks
+* Night-time robustness not heavily optimized
+* Domain shift possible outside mixed-traffic environments
+
+---
+
+# Ethical Considerations
+
+This system:
+
+* detects **vehicle categories only**
+* does **not identify individuals**
+* supports **privacy-preserving traffic analytics**
+* is suitable for **edge deployment**
+
+---
+
+# Roadmap
+
+Planned improvements include:
+
+* multi-direction junction counting
+* stronger motorcycle detection
+* low-light training augmentation
+* improved edge inference performance
+* Android real-time deployment
+
+---
+
+# License
+
+MIT License
+
+```
+```

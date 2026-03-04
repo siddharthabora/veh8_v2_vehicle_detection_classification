@@ -19,7 +19,7 @@ D --> G[Observation Stable near counting line lightweight]
 
 E --> H[Rejected for counting use case]
 
-F --> H
+F --> H[Rejected for counting use case]
 
 G --> I[Selected for line crossing counting]
 

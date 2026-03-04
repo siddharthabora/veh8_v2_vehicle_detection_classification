@@ -1,0 +1,8 @@
+# configs/counter.yaml
+
+# Line-cross counting params
+line_frac: 0.75
+direction: top_to_bottom
+
+# Anti double-count gating (used later)
+exit_band_frac: 0.06

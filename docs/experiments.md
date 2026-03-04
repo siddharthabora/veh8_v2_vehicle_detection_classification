@@ -1,5 +1,29 @@
 # Experiments Log: Tracking + Counting
 
+## Tracking Experiments
+
+```mermaid
+flowchart TD
+
+A[YOLO Detection Output] --> B[Experiment 1 ByteTrack]
+
+A --> C[Experiment 2 DeepSORT]
+
+A --> D[Experiment 3 Minimal Centroid Tracker]
+
+B --> E[Observation ID fragmentation in dense traffic]
+
+C --> F[Observation Too many track IDs heavy compute]
+
+D --> G[Observation Stable near counting line lightweight]
+
+E --> H[Rejected for counting use case]
+
+F --> H
+
+G --> I[Selected for line crossing counting]
+
+
 ## Goal
 Count vehicles by class using a horizontal line at 0.75 of frame height, robust to dense traffic and occlusion, targeting edge deployment.
 

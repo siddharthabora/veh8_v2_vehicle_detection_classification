@@ -19,9 +19,11 @@ D --> G[Observation Stable near counting line lightweight]
 
 E --> H[Rejected for counting use case]
 
-F --> H[Rejected for counting use case]
+F --> H
 
 G --> I[Selected for line crossing counting]
+
+---
 
 ## Goal
 Count vehicles by class using a horizontal line at 0.75 of frame height, robust to dense traffic and occlusion, targeting edge deployment.

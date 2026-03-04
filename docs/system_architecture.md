@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TD
     A[Input Video / Camera Stream] --> B[Frame Decoder: OpenCV / CameraX]
-    B --> C[Detector: YOLOv8 veh8_v2.1 (.pt / later TFLite)]
+    B --> C[Detector: YOLOv8 "veh8_v2.1 (.pt / later TFLite)"]
     C --> D[Detections per frame\n(bboxes, class_id, conf)]
     D --> E[Tracking Layer\n(ByteTrack / DeepSORT experiments)\nCurrent: Minimal Centroid Tracker]
     E --> F[Tracklets\n(track_id, centroid trajectory, class history)]

@@ -1,0 +1,6 @@
+# configs/tracker.yaml
+
+# Centroid tracker params
+max_dist_px: 80
+ttl_seconds: 0.5
+min_hits: 3

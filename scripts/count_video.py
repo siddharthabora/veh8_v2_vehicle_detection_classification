@@ -39,6 +39,8 @@ def main():
     tracker_cfg_yaml = load_yaml(args.tracker_config) or {}
     counter_cfg_yaml = load_yaml(args.counter_config) or {}
 
+    print(counter_cfg_yaml)
+
     model = YOLO(args.model)
 
     cap = cv2.VideoCapture(args.video)

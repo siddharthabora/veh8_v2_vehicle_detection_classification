@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environment
+venv/
+
+# Mac system files
+.DS_Store
+
+# Output artifacts
+outputs/*.mp4
+outputs/*.csv
+
+# VS Code
+.vscode/

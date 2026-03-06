@@ -13,6 +13,15 @@ video → detection → tracking → counting → analytics
 
 ---
 
+# Run Demo
+
+chmod +x run_demo.sh
+./run_demo.sh <path_to_video>
+
+Example: ./run_demo.sh outputs/test_video.mp4
+
+---
+
 # System Pipeline
 
 This repository implements a modular pipeline that converts raw video streams into structured traffic events.

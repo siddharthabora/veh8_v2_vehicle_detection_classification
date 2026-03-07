@@ -22,6 +22,14 @@ Example: ./run_demo.sh outputs/test_video.mp4
 
 ---
 
+# Run tests
+
+pytest -q
+
+Expected output: 3 passed
+
+---
+
 # System Pipeline
 
 This repository implements a modular pipeline that converts raw video streams into structured traffic events.

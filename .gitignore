@@ -1,17 +1,23 @@
-# Python cache
+.vscode/settings.json
+.env
+
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Virtual environment
-venv/
-
-# Mac system files
 .DS_Store
 
-# Output artifacts
-outputs/*.mp4
-outputs/*.csv
+storage/uploads/
+storage/jobs/
 
-# VS Code
-.vscode/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.csv
+
+outputs/

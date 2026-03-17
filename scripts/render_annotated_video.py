@@ -27,6 +27,8 @@ def parse_args():
 
     parser.add_argument("--tracker_config", default="configs/tracker.yaml")
     parser.add_argument("--counter_config", default="configs/counter.yaml")
+    parser.add_argument("--line_frac", type=float, default=None)
+    parser.add_argument("--direction", type=str, default=None)
 
     return parser.parse_args()
 
@@ -68,8 +70,11 @@ def main():
 
     h, w = frame.shape[:2]
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
     writer = cv2.VideoWriter(args.output, fourcc, fps, (w, h))
+
+    if not writer.isOpened():
+        raise RuntimeError("Could not open video writer with avc1 codec")
 
     ttl_seconds = tracker_yaml.get("ttl_seconds", 0.5)
     ttl_frames = max(1, int(ttl_seconds * fps))
@@ -80,10 +85,28 @@ def main():
         min_hits=int(tracker_yaml.get("min_hits", 3)),
     )
 
-    counter_cfg = LineCounterConfig(
-        line_frac=float(counter_yaml.get("line_frac", 0.75)),
-        direction=str(counter_yaml.get("direction", "top_to_bottom")),
+    resolved_line_frac = (
+    float(args.line_frac)
+    if args.line_frac is not None
+    else float(counter_yaml.get("line_frac", 0.75))
     )
+
+    resolved_direction = (
+    str(args.direction)
+    if args.direction is not None
+    else str(counter_yaml.get("direction", "top_to_bottom"))
+    )
+
+    counter_cfg = LineCounterConfig(
+    line_frac=resolved_line_frac,
+    direction=resolved_direction,
+    )
+
+    print({
+    "counter_config_yaml": counter_yaml,
+    "resolved_line_frac": resolved_line_frac,
+    "resolved_direction": resolved_direction,
+    })
 
     line = HorizontalLine.from_height(h, counter_cfg.line_frac)
 
@@ -157,6 +180,56 @@ def main():
             (w, line.y),
             (0, 0, 255),
             3
+        )
+
+        label_text = f"line_frac: {counter_cfg.line_frac:.2f}"
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.5
+        font_thickness = 4
+
+        (text_w, text_h), baseline = cv2.getTextSize(label_text, font, font_scale, font_thickness)
+
+        padding_x = 10
+        padding_y = 8
+
+        box_w = text_w + (padding_x * 2)
+        box_h = text_h + (padding_y * 2)
+
+        box_x2 = w - 16
+        box_x1 = box_x2 - box_w
+
+        box_y2 = max(50, int(line.y) - 16)
+        box_y1 = box_y2 - box_h
+
+        cv2.rectangle(
+            frame,
+            (box_x1, box_y1),
+            (box_x2, box_y2),
+            (255, 255, 255),
+            thickness=-1,
+        )
+
+        cv2.rectangle(
+            frame,
+            (box_x1, box_y1),
+            (box_x2, box_y2),
+            (220, 220, 220),
+            thickness=1,
+        )
+
+        text_x = box_x1 + padding_x
+        text_y = box_y2 - padding_y
+
+        cv2.putText(
+            frame,
+            label_text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (25, 25, 25),
+            font_thickness,
+            cv2.LINE_AA,
         )
 
         draw_counts(frame, counter.counts)

@@ -1,0 +1,365 @@
+:root {
+    --progress-blue-1: #38bdf8;
+    --progress-blue-2: #2563eb;
+    --progress-blue-3: #1d4ed8;
+    --progress-blue-4: #0f3cc9;
+    --progress-navy: #0f172a;
+    --progress-panel: rgba(255, 255, 255, 0.94);
+    --progress-line: rgba(255, 255, 255, 0.18);
+    --progress-text: #eaf2ff;
+    --progress-muted: #c7d8f7;
+    --progress-shadow: 0 24px 80px rgba(2, 6, 23, 0.45);
+    --progress-glow: 0 0 26px rgba(56, 189, 248, 0.26);
+}
+
+.processing-overlay[hidden] {
+    display: none !important;
+}
+
+.processing-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background:
+        radial-gradient(circle at 18% 16%, rgba(37, 99, 235, 0.24), transparent 26%),
+        radial-gradient(circle at 80% 14%, rgba(14, 165, 233, 0.20), transparent 22%),
+        radial-gradient(circle at 50% 90%, rgba(56, 189, 248, 0.10), transparent 26%),
+        rgba(15, 23, 42, 0.84);
+    backdrop-filter: blur(10px);
+    opacity: 1;
+    transition: opacity 280ms ease;
+}
+
+.processing-overlay.is-fading-out {
+    opacity: 0;
+}
+
+.processing-overlay-shell {
+    width: min(980px, 100%);
+    display: grid;
+    gap: 22px;
+    justify-items: center;
+}
+
+.processing-carousel-frame {
+    width: min(860px, 100%);
+    border-radius: 30px;
+    padding: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: var(--progress-shadow);
+    overflow: hidden;
+}
+
+.processing-carousel-track {
+    display: flex;
+    gap: 16px;
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+
+.processing-card {
+    flex: 0 0 calc(33.333% - 11px);
+    min-height: 290px;
+    border-radius: 24px;
+    padding: 18px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,249,255,0.95));
+    border: 1px solid rgba(219, 228, 238, 0.95);
+    display: grid;
+    align-content: space-between;
+    gap: 16px;
+    opacity: 0.42;
+    transform: scale(0.95) translateY(8px);
+    filter: saturate(0.8);
+    transition:
+        opacity 320ms ease,
+        transform 320ms ease,
+        filter 320ms ease,
+        box-shadow 320ms ease;
+}
+
+.processing-card.is-active {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: saturate(1);
+    box-shadow: 0 18px 36px rgba(37, 99, 235, 0.16);
+}
+
+.processing-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.processing-card-stage {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #2563eb;
+}
+
+.processing-card-badge {
+    font-size: 11px;
+    font-weight: 800;
+    color: #0f172a;
+    background: #e6f0ff;
+    border-radius: 999px;
+    padding: 7px 10px;
+}
+
+.processing-card-visual {
+    min-height: 156px;
+    display: grid;
+    place-items: center;
+}
+
+.processing-emoji-orb {
+    position: relative;
+    width: 136px;
+    height: 136px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 58px;
+    background:
+        radial-gradient(circle at 30% 30%, #ffffff, #dbeafe 58%, #bfdbfe 100%);
+    box-shadow:
+        inset 0 8px 20px rgba(255,255,255,0.78),
+        0 16px 32px rgba(37, 99, 235, 0.18),
+        var(--progress-glow);
+    animation: processingFloat 2.8s ease-in-out infinite;
+    overflow: hidden;
+}
+
+.processing-emoji-orb::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 28% 28%, rgba(255,255,255,0.75), transparent 18%),
+        linear-gradient(135deg, rgba(255,255,255,0.26), rgba(255,255,255,0));
+    pointer-events: none;
+}
+
+.processing-emoji-orb::after {
+    content: "";
+    position: absolute;
+    width: 180%;
+    height: 180%;
+    background:
+        conic-gradient(
+            from 180deg,
+            rgba(56, 189, 248, 0.0),
+            rgba(56, 189, 248, 0.18),
+            rgba(37, 99, 235, 0.0)
+        );
+    animation: pulseSpin 4.8s linear infinite;
+    pointer-events: none;
+}
+
+.processing-emoji {
+    position: relative;
+    z-index: 1;
+}
+
+.processing-card-text {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.45;
+    min-height: 44px;
+}
+
+.processing-status-copy {
+    text-align: center;
+    display: grid;
+    gap: 10px;
+}
+
+.processing-status-title {
+    margin: 0;
+    color: var(--progress-text);
+    font-size: clamp(24px, 3vw, 34px);
+    line-height: 1.1;
+}
+
+.processing-status-subtitle {
+    margin: 0;
+    color: var(--progress-muted);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 22px;
+}
+
+.processing-progress-wrap {
+    width: min(760px, 100%);
+    display: grid;
+    gap: 12px;
+}
+
+.processing-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    color: var(--progress-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.processing-progress-shell {
+    position: relative;
+    height: 28px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid var(--progress-line);
+    box-shadow:
+        inset 0 8px 14px rgba(2, 6, 23, 0.22),
+        0 10px 24px rgba(2, 6, 23, 0.16);
+}
+
+.processing-progress-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0%;
+    border-radius: 999px;
+    background:
+        linear-gradient(90deg, var(--progress-blue-1), var(--progress-blue-2), var(--progress-blue-3), var(--progress-blue-4));
+    box-shadow:
+        inset 0 10px 18px rgba(255, 255, 255, 0.16),
+        0 0 20px rgba(37, 99, 235, 0.35);
+    overflow: hidden;
+    transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.processing-progress-fill::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(
+            120deg,
+            rgba(255,255,255,0.08) 0%,
+            rgba(255,255,255,0.22) 25%,
+            rgba(255,255,255,0.08) 50%,
+            rgba(255,255,255,0.20) 75%,
+            rgba(255,255,255,0.08) 100%
+        );
+    background-size: 240px 100%;
+    animation: waterFlow 1.35s linear infinite;
+}
+
+.processing-progress-fill::after {
+    content: "";
+    position: absolute;
+    inset: 2px 0 auto 0;
+    height: 45%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0.03));
+}
+
+.processing-stage-label {
+    color: var(--progress-muted);
+    font-size: 13px;
+    text-align: center;
+    font-weight: 600;
+    min-height: 20px;
+}
+
+.processing-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    color: var(--progress-text);
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid rgba(255,255,255,0.14);
+}
+
+.processing-status-chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+}
+
+@keyframes waterFlow {
+    0% {
+        transform: translateX(-120px);
+    }
+    100% {
+        transform: translateX(120px);
+    }
+}
+
+@keyframes processingFloat {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes pulseSpin {
+    0% {
+        transform: rotate(0deg);
+        opacity: 0.65;
+    }
+    50% {
+        opacity: 0.9;
+    }
+    100% {
+        transform: rotate(360deg);
+        opacity: 0.65;
+    }
+}
+
+@media (max-width: 900px) {
+    .processing-card {
+        flex: 0 0 calc(50% - 8px);
+    }
+}
+
+@media (max-width: 640px) {
+    .processing-overlay-shell {
+        gap: 18px;
+    }
+
+    .processing-carousel-frame {
+        padding: 14px;
+        border-radius: 22px;
+    }
+
+    .processing-card {
+        flex: 0 0 100%;
+        min-height: 250px;
+    }
+
+    .processing-emoji-orb {
+        width: 112px;
+        height: 112px;
+        font-size: 48px;
+    }
+
+    .processing-progress-shell {
+        height: 24px;
+    }
+
+    .processing-progress-meta {
+        font-size: 13px;
+    }
+}

@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vehicle Volume Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+</head>
+<body class="dashboard-page">
+    <div class="mobile-topbar">
+        <button type="button" class="menu-toggle-btn" id="menuToggleBtn" aria-label="Open navigation">
+            ☰
+        </button>
+    </div>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <a href="/" class="sidebar-brand sidebar-brand-link">
+                <div class="sidebar-brand-icon">🚦</div>
+                <div>
+                    <div class="sidebar-brand-title">TrafficVision AI</div>
+                    <div class="sidebar-brand-subtitle">Vehicle Volume Analyzer</div>
+                </div>
+            </a>
+
+            <nav class="sidebar-nav">
+                <a href="/" class="sidebar-link active">Analyzer</a>
+                <a href="#" class="sidebar-link">History</a>
+            </nav>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <div class="dashboard-upload-form">
+                    <a href="/" class="secondary-btn" id="replaceVideoButton">📤 Upload Another Video</a>
+                </div>
+            </header>
+
+            <section class="dashboard-grid top-grid">
+                <article class="panel-card">
+                    <div class="panel-header">
+                        <h2>Setup & Preview</h2>
+                        <button type="button" class="secondary-btn" id="changeVideoButton">🔄 Change Video</button>
+                    </div>
+
+                    <div class="video-panel">
+                        {% if input_video_url %}
+                        <video class="dashboard-video" controls preload="metadata">
+                            <source src="{{ input_video_url }}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        {% else %}
+                        <div class="video-empty-state">Input video preview not available.</div>
+                        {% endif %}
+
+                        <div class="line-editor-overlay" id="lineEditorOverlay">
+                            <div class="draggable-count-line" id="draggableCountLine"></div>
+                            <div class="draggable-line-badge" id="draggableLineBadge">
+                                line_frac: <span id="lineFracValue">{{ job_info.line_frac if job_info else '0.75' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-footer">
+                        <form action="/process" method="post" enctype="multipart/form-data" class="process-inline-form">
+                            <input id="hiddenProcessVideoInput" type="file" name="video" accept="video/*" hidden>
+                            <input type="hidden" name="line_frac" value="{{ job_info.line_frac if job_info else '0.75' }}">
+                            <input type="hidden" name="direction" value="{{ job_info.direction if job_info else 'top_to_bottom' }}">
+                            <button type="button" class="primary-btn" id="processVideoButton" disabled>Process Video ✨</button>
+                        </form>
+                    </div>
+                </article>
+
+                <article class="panel-card">
+                    <div class="panel-header">
+                        <h2>Processed Video</h2>
+                        {% if video_url %}
+                        <a href="{{ video_download_url }}" class="secondary-btn">📥 Download Video</a>
+                        {% endif %}
+                    </div>
+
+                    <div class="video-panel">
+                        {% if video_url %}
+                        <video class="dashboard-video" controls preload="metadata">
+                            <source src="{{ video_url }}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        {% else %}
+                        <div class="video-empty-state">Processed preview will appear here after the pipeline completes.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="status-row">
+                        <span>Status:
+                            <strong class="status-pill status-{{ status.status if status and status.status else 'unknown' }}">
+                                {{ status.status if status and status.status else 'unknown' }}
+                            </strong>
+                        </span>
+
+                        <span>Total Counted:
+                            <strong>{{ summary.total_count if summary else 0 }}</strong>
+                        </span>
+                    </div>
+                </article>
+            </section>
+
+            <section class="panel-card traffic-highlights-card">
+                <div class="panel-header traffic-highlights-header">
+                    <div>
+                        <h2>Traffic Highlights</h2>
+                        <p class="helper-text">Quick summary of the busiest or lightest active traffic bucket.</p>
+                    </div>
+
+                    <select class="chart-select" id="trafficHighlightModeSelect">
+                        <option value="peak" selected>Peak</option>
+                        <option value="trough">Trough</option>
+                    </select>
+                </div>
+
+                <div class="traffic-highlights-grid">
+                    <article class="traffic-highlight-tile">
+                        <div class="traffic-highlight-label">Time Range</div>
+                        <div class="traffic-highlight-value" id="trafficHighlightTimeRange">No data</div>
+                    </article>
+
+                    <article class="traffic-highlight-tile">
+                        <div class="traffic-highlight-label">Vehicle Class</div>
+                        <div class="traffic-highlight-value" id="trafficHighlightVehicleClass">No data</div>
+                    </article>
+
+                    <article class="traffic-highlight-tile">
+                        <div class="traffic-highlight-label">Vehicle Count</div>
+                        <div class="traffic-highlight-value" id="trafficHighlightVehicleCount">0</div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="ai-chat-dock" id="aiChatDock">
+                <div class="ai-chat-dock-shell">
+                    <div
+                        id="aiChatDockHeader"
+                        style="
+                            display:flex;
+                            justify-content:flex-end;
+                            align-items:center;
+                            padding:8px 12px 0 12px;
+                        "
+                    >
+                        <button
+                            type="button"
+                            id="aiChatDockToggleButton"
+                            aria-label="Collapse chat"
+                            title="Collapse chat"
+                            style="
+                                display:none;
+                                width:34px;
+                                height:34px;
+                                border:none;
+                                border-radius:999px;
+                                background:linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%);
+                                color:#0f172a;
+                                font-size:18px;
+                                font-weight:700;
+                                line-height:1;
+                                cursor:pointer;
+                                box-shadow:0 6px 18px rgba(15,23,42,0.10), inset 0 0 0 1px rgba(148,163,184,0.22);
+                                transition:transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+                                align-items:center;
+                                justify-content:center;
+                            "
+                        >
+                            ⌄
+                        </button>
+                    </div>
+
+                    <div class="ai-chat-dock-body" id="aiChatDockBody">
+                        <div id="chatMessages" class="ai-chat-messages"></div>
+
+                        <form id="jobChatForm" class="ai-chat-form">
+                            <input
+                                id="jobChatInput"
+                                type="text"
+                                class="ai-chat-input"
+                                placeholder="Ask me about peak periods, dominant vehicle classes, traffic patterns, anomalies, or limits of inference from this video"
+                                autocomplete="off"
+                                required
+                            >
+                            <button type="submit" class="ai-chat-send-button" id="jobChatSendButton" aria-label="Send message">
+                                ➤
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-grid middle-grid">
+                <article class="panel-card">
+                    <div class="panel-header chart-header-wrap chart-controls-wrap">
+                        <h2>Volume Timeline</h2>
+
+                        <div class="chart-toolbar">
+                            <select class="chart-select" id="timelineModeSelect">
+                                <option value="total" selected>Total</option>
+                                <option value="by_class">By Class</option>
+                                <option value="cumulative">Cumulative</option>
+                            </select>
+
+                            <select class="chart-select" id="timeBucketSelect"></select>
+                        </div>
+                    </div>
+
+                    <div class="chart-wrap">
+                        <canvas id="volumeTimelineChart"></canvas>
+                    </div>
+                </article>
+
+                <article class="panel-card">
+                    <div class="panel-header">
+                        <h2>Class Breakdown</h2>
+                    </div>
+
+                    <div class="pie-layout">
+                        <div class="pie-canvas-wrap">
+                            <canvas id="classBreakdownChart"></canvas>
+                        </div>
+
+                        <div class="pie-side-legend" id="classLegend"></div>
+                    </div>
+                </article>
+            </section>
+
+            <section class="panel-card">
+                <div class="panel-header">
+                    <h2>Event Log & Data Breakdown</h2>
+                    {% if csv_url %}
+                    <a href="{{ csv_url }}" class="secondary-btn">📥 Export CSV</a>
+                    {% endif %}
+                </div>
+
+                <div class="table-wrap">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Vehicle ID</th>
+                                <th>Class detected</th>
+                                <th>Direction</th>
+                                <th>Crossing frame</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if events %}
+                                {% for event in events %}
+                                <tr>
+                                    <td>{{ event.timestamp_seconds }}</td>
+                                    <td>#V-{{ event.track_id }}</td>
+                                    <td>
+                                        <span class="class-chip" data-class-name="{{ event.vehicle_class }}">
+                                            {{ event.vehicle_class }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if event.direction == "top_to_bottom" %}
+                                            Southbound
+                                        {% elif event.direction == "bottom_to_top" %}
+                                            Northbound
+                                        {% elif event.direction == "left_to_right" %}
+                                            Eastbound
+                                        {% elif event.direction == "right_to_left" %}
+                                            Westbound
+                                        {% else %}
+                                            {{ event.direction }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ event.crossing_frame }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="empty-table-cell">No crossing events available yet.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        Chart.register(ChartDataLabels);
+
+        const replaceVideoButton = document.getElementById("replaceVideoButton");
+        const changeVideoButton = document.getElementById("changeVideoButton");
+
+        changeVideoButton?.addEventListener("click", () => {
+            window.location.href = "/";
+        });
+
+        const menuToggleBtn = document.getElementById("menuToggleBtn");
+        const sidebar = document.getElementById("sidebar");
+        const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+
+        function openSidebar() {
+            sidebar?.classList.add("open");
+            sidebarBackdrop?.classList.add("open");
+        }
+
+        function closeSidebar() {
+            sidebar?.classList.remove("open");
+            sidebarBackdrop?.classList.remove("open");
+        }
+
+        menuToggleBtn?.addEventListener("click", openSidebar);
+        sidebarBackdrop?.addEventListener("click", closeSidebar);
+
+        const lineEditorOverlay = document.getElementById("lineEditorOverlay");
+        const draggableCountLine = document.getElementById("draggableCountLine");
+        const draggableLineBadge = document.getElementById("draggableLineBadge");
+        const lineFracValue = document.getElementById("lineFracValue");
+        const processLineFracInput = document.getElementById("processLineFracInput");
+
+        let currentLineFrac = Number("{{ (job_info.line_frac if job_info and job_info.line_frac is not none else 0.75) }}");
+        if (Number.isNaN(currentLineFrac)) {
+            currentLineFrac = 0.75;
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function syncLineEditor(lineFrac) {
+            const safeFrac = clamp(lineFrac, 0.05, 0.95);
+            currentLineFrac = safeFrac;
+
+            if (draggableCountLine) {
+                draggableCountLine.style.top = `${safeFrac * 100}%`;
+            }
+
+            if (draggableLineBadge) {
+                draggableLineBadge.style.top = `${safeFrac * 100}%`;
+            }
+
+            if (lineFracValue) {
+                lineFracValue.textContent = safeFrac.toFixed(2);
+            }
+
+            if (processLineFracInput) {
+                processLineFracInput.value = safeFrac.toFixed(2);
+            }
+        }
+
+        syncLineEditor(currentLineFrac);
+
+        const classColorMap = {
+            "auto": "#f97316",
+            "bus": "#8b5cf6",
+            "car": "#2563eb",
+            "light_motor_vehicle": "#06b6d4",
+            "motorcycle": "#10b981",
+            "multi-axle": "#ef4444",
+            "tractor": "#eab308",
+            "truck": "#6366f1",
+            "No Data": "#cbd5e1"
+        };
+
+        function getClassColor(className) {
+            return classColorMap[className] || "#94a3b8";
+        }
+
+        document.querySelectorAll(".legend-dot").forEach((dot) => {
+            const className = dot.dataset.className;
+            dot.style.backgroundColor = getClassColor(className);
+        });
+
+        document.querySelectorAll(".class-chip").forEach((chip) => {
+            const className = chip.dataset.className;
+            const color = getClassColor(className);
+            chip.style.borderColor = color;
+            chip.style.color = color;
+            chip.style.backgroundColor = `${color}15`;
+        });
+
+        const currentJobId = "{{ job_id }}";
+        const eventsData = {{ (events if events else []) | tojson }};
+        const rawCountsByClass = {{ (summary.counts_by_class if summary and summary.counts_by_class else {}) | tojson }};
+        const summaryTrafficHighlights = {{ (summary.traffic_highlights if summary and summary.traffic_highlights else {}) | tojson }};
+
+        const countsByClass = Object.fromEntries(
+            Object.entries(rawCountsByClass).filter(([_, value]) => Number(value) > 0)
+        );
+
+        function formatBucketLabel(bucketStartSec, bucketSizeSec) {
+            if (bucketSizeSec < 60) {
+                return `${bucketStartSec}s`;
+            }
+
+            const startMin = Math.floor(bucketStartSec / 60);
+            const endMin = Math.floor((bucketStartSec + bucketSizeSec) / 60);
+
+            if (bucketSizeSec === 60) {
+                return `${startMin}m`;
+            }
+
+            return `${startMin}-${endMin}m`;
+        }
+
+        function getBucketOptions(maxSeconds) {
+            if (maxSeconds < 60) {
+                return [
+                    { label: "1 second", value: 1 },
+                    { label: "5 seconds", value: 5 },
+                    { label: "10 seconds", value: 10 }
+                ];
+            }
+
+            if (maxSeconds <= 300) {
+                return [
+                    { label: "10 seconds", value: 10 },
+                    { label: "30 seconds", value: 30 },
+                    { label: "1 minute", value: 60 }
+                ];
+            }
+
+            if (maxSeconds <= 1800) {
+                return [
+                    { label: "30 seconds", value: 30 },
+                    { label: "1 minute", value: 60 },
+                    { label: "5 minutes", value: 300 }
+                ];
+            }
+
+            if (maxSeconds <= 7200) {
+                return [
+                    { label: "1 minute", value: 60 },
+                    { label: "5 minutes", value: 300 },
+                    { label: "10 minutes", value: 600 }
+                ];
+            }
+
+            return [
+                { label: "1 minute", value: 60 },
+                { label: "5 minutes", value: 300 },
+                { label: "10 minutes", value: 600 },
+                { label: "15 minutes", value: 900 },
+                { label: "30 minutes", value: 1800 }
+            ];
+        }
+
+        function getDefaultBucket(maxSeconds) {
+            if (maxSeconds < 60) {
+                return 5;
+            }
+            if (maxSeconds <= 300) {
+                return 30;
+            }
+            if (maxSeconds <= 1800) {
+                return 60;
+            }
+            return 300;
+        }
+
+        function normalizeClassName(className) {
+            return String(className || "").trim();
+        }
+
+        function formatVehicleClassLabel(className) {
+            const normalized = normalizeClassName(className);
+
+            const classLabelMap = {
+                "auto": "Auto",
+                "bus": "Bus",
+                "car": "Car",
+                "light_motor_vehicle": "Light Motor Vehicle",
+                "motorcycle": "Motorcycle",
+                "multi-axle": "Multi-Axle",
+                "tractor": "Tractor",
+                "truck": "Truck",
+                "unknown": "Unknown",
+                "No data": "No data",
+                "No Data": "No data"
+            };
+
+            if (classLabelMap[normalized]) {
+                return classLabelMap[normalized];
+            }
+
+            if (!normalized) {
+                return "No data";
+            }
+
+            return normalized
+                .replace(/[_-]+/g, " ")
+                .replace(/\b\w/g, (char) => char.toUpperCase());
+        }
+
+        function buildTimelineBuckets(events, bucketSizeSec) {
+            if (!events.length) {
+                return {
+                    labels: ["0s"],
+                    totals: [0],
+                    byClass: {}
+                };
+            }
+
+            const normalizedEvents = events
+                .map((event) => ({
+                    timestamp: Number(event.timestamp_seconds || 0),
+                    vehicleClass: normalizeClassName(event.vehicle_class)
+                }))
+                .filter((event) => !Number.isNaN(event.timestamp));
+
+            if (!normalizedEvents.length) {
+                return {
+                    labels: ["0s"],
+                    totals: [0],
+                    byClass: {}
+                };
+            }
+
+            const maxSeconds = Math.max(...normalizedEvents.map(event => event.timestamp), 0);
+            const bucketCount = Math.max(1, Math.ceil((maxSeconds + 0.0001) / bucketSizeSec));
+
+            const totals = new Array(bucketCount).fill(0);
+            const byClass = {};
+
+            normalizedEvents.forEach((event) => {
+                const rawIndex = Math.floor(event.timestamp / bucketSizeSec);
+                const index = Math.min(bucketCount - 1, rawIndex);
+
+                totals[index] += 1;
+
+                if (!byClass[event.vehicleClass]) {
+                    byClass[event.vehicleClass] = new Array(bucketCount).fill(0);
+                }
+
+                byClass[event.vehicleClass][index] += 1;
+            });
+
+            const labels = totals.map((_, index) => formatBucketLabel(index * bucketSizeSec, bucketSizeSec));
+
+            return {
+                labels,
+                totals,
+                byClass
+            };
+        }
+
+        function buildCumulativeSeries(values) {
+            let runningTotal = 0;
+            return values.map((value) => {
+                runningTotal += value;
+                return runningTotal;
+            });
+        }
+
+        function formatClockTime(totalSeconds) {
+            const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+            const minutes = Math.floor(safeSeconds / 60);
+            const seconds = safeSeconds % 60;
+
+            if (minutes === 0) {
+                return `${seconds}s`;
+            }
+
+            return `${minutes}m ${seconds}s`;
+        }
+
+        function formatHighlightRange(bucketLabel, bucketStartSec, bucketSizeSec) {
+            const startSec = Math.max(0, Math.floor(Number(bucketStartSec) || 0));
+            const endSec = Math.max(startSec, Math.floor((Number(bucketStartSec) || 0) + (Number(bucketSizeSec) || 0)));
+
+            if ((Number(bucketSizeSec) || 0) < 60) {
+                return `${startSec}-${endSec} sec`;
+            }
+
+            return `${formatClockTime(startSec)}-${formatClockTime(endSec)}`;
+        }
+
+        function getHighlightFromTimelineData(timelineData, bucketSizeSec, mode) {
+            const emptyResult = {
+                time_range: "No data",
+                vehicle_class: "No data",
+                vehicle_count: 0
+            };
+
+            if (!timelineData || !Array.isArray(timelineData.totals) || !timelineData.totals.length) {
+                return emptyResult;
+            }
+
+            const candidateIndexes = timelineData.totals
+                .map((count, index) => ({ count, index }))
+                .filter((item) => Number(item.count) > 0);
+
+            if (!candidateIndexes.length) {
+                return emptyResult;
+            }
+
+            const selectedBucket = mode === "trough"
+                ? candidateIndexes.reduce((best, current) => current.count < best.count ? current : best)
+                : candidateIndexes.reduce((best, current) => current.count > best.count ? current : best);
+
+            const bucketIndex = selectedBucket.index;
+            const bucketTotal = Number(selectedBucket.count) || 0;
+
+            let dominantClass = "No data";
+            let dominantCount = -1;
+
+            Object.entries(timelineData.byClass || {}).forEach(([className, values]) => {
+                const value = Number(values?.[bucketIndex] || 0);
+                if (value > dominantCount) {
+                    dominantCount = value;
+                    dominantClass = className;
+                }
+            });
+
+            const bucketLabel = timelineData.labels?.[bucketIndex] || "";
+            const bucketStartSec = bucketIndex * bucketSizeSec;
+
+            return {
+                time_range: formatHighlightRange(bucketLabel, bucketStartSec, bucketSizeSec),
+                vehicle_class: dominantClass || "No data",
+                vehicle_count: bucketTotal
+            };
+        }
+
+        const trafficHighlightModeSelect = document.getElementById("trafficHighlightModeSelect");
+        const trafficHighlightTimeRange = document.getElementById("trafficHighlightTimeRange");
+        const trafficHighlightVehicleClass = document.getElementById("trafficHighlightVehicleClass");
+        const trafficHighlightVehicleCount = document.getElementById("trafficHighlightVehicleCount");
+
+        function renderTrafficHighlights() {
+            if (!trafficHighlightModeSelect || !trafficHighlightTimeRange || !trafficHighlightVehicleClass || !trafficHighlightVehicleCount) {
+                return;
+            }
+
+            const selectedMode = trafficHighlightModeSelect.value || "peak";
+            const selectedBucket = Number(timeBucketSelect?.value || summaryTrafficHighlights?.default_bucket_seconds || defaultBucket || 5);
+
+            const timelineData = buildTimelineBuckets(eventsData, selectedBucket);
+            const highlight = getHighlightFromTimelineData(timelineData, selectedBucket, selectedMode);
+
+            trafficHighlightTimeRange.textContent = highlight.time_range || "No data";
+            trafficHighlightVehicleClass.textContent = formatVehicleClassLabel(highlight.vehicle_class);
+            trafficHighlightVehicleCount.textContent = String(highlight.vehicle_count || 0);
+        }
+
+        const timelineModeSelect = document.getElementById("timelineModeSelect");
+        const timeBucketSelect = document.getElementById("timeBucketSelect");
+        const timelineCanvas = document.getElementById("volumeTimelineChart");
+
+        let timelineChartInstance = null;
+
+        function renderTimelineChart(bucketSizeSec, mode) {
+            const timelineData = buildTimelineBuckets(eventsData, bucketSizeSec);
+
+            if (timelineChartInstance) {
+                timelineChartInstance.destroy();
+            }
+
+            let chartType = "bar";
+            let datasets = [];
+            let yAxisTitle = "Count";
+
+            if (mode === "total") {
+                datasets = [
+                    {
+                        label: "Vehicles counted",
+                        data: timelineData.totals,
+                        backgroundColor: "rgba(37, 99, 235, 0.75)",
+                        borderColor: "#2563eb",
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ];
+            } else if (mode === "cumulative") {
+                chartType = "line";
+                datasets = [
+                    {
+                        label: "Cumulative count",
+                        data: buildCumulativeSeries(timelineData.totals),
+                        borderColor: "#2563eb",
+                        backgroundColor: "rgba(37, 99, 235, 0.12)",
+                        fill: true,
+                        tension: 0.25,
+                        pointRadius: timelineData.totals.length === 1 ? 6 : 3,
+                        pointHoverRadius: 6
+                    }
+                ];
+            } else if (mode === "by_class") {
+                const classNames = Object.keys(timelineData.byClass).filter((className) => {
+                    const values = timelineData.byClass[className] || [];
+                    return values.some((value) => value > 0);
+                });
+
+                datasets = classNames.map((className) => ({
+                    label: className,
+                    data: timelineData.byClass[className],
+                    backgroundColor: `${getClassColor(className)}CC`,
+                    borderColor: getClassColor(className),
+                    borderWidth: 1,
+                    borderRadius: 6
+                }));
+            }
+
+            if (!datasets.length) {
+                datasets = [
+                    {
+                        label: "Vehicles counted",
+                        data: [0],
+                        backgroundColor: "rgba(148, 163, 184, 0.65)",
+                        borderColor: "#94a3b8",
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ];
+            }
+
+            timelineChartInstance = new Chart(timelineCanvas, {
+                type: chartType,
+                data: {
+                    labels: timelineData.labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: mode === "by_class",
+                            ticks: {
+                                precision: 0
+                            },
+                            title: {
+                                display: true,
+                                text: yAxisTitle
+                            }
+                        },
+                        x: {
+                            stacked: mode === "by_class",
+                            title: {
+                                display: true,
+                                text: "Time bucket"
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: "top"
+                        },
+                        tooltip: {
+                            mode: "index",
+                            intersect: false
+                        },
+                        datalabels: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        const maxTimestamp = eventsData.length
+            ? Math.max(...eventsData.map(event => Number(event.timestamp_seconds || 0)).filter(value => !Number.isNaN(value)))
+            : 0;
+
+        const bucketOptions = getBucketOptions(maxTimestamp);
+        const defaultBucket = getDefaultBucket(maxTimestamp);
+
+        bucketOptions.forEach((option) => {
+            const opt = document.createElement("option");
+            opt.value = option.value;
+            opt.textContent = `Time: ${option.label}`;
+            if (option.value === defaultBucket) {
+                opt.selected = true;
+            }
+            timeBucketSelect.appendChild(opt);
+        });
+
+        function renderTimelineFromControls() {
+            const selectedBucket = Number(timeBucketSelect.value || defaultBucket || 5);
+            const selectedMode = timelineModeSelect?.value || "total";
+            renderTimelineChart(selectedBucket, selectedMode);
+        }
+
+        function syncTimelineAndHighlights() {
+            renderTimelineFromControls();
+            renderTrafficHighlights();
+        }
+
+        syncTimelineAndHighlights();
+
+        timeBucketSelect.addEventListener("change", syncTimelineAndHighlights);
+        timelineModeSelect?.addEventListener("change", renderTimelineFromControls);
+        trafficHighlightModeSelect?.addEventListener("change", renderTrafficHighlights);
+
+        const classLegend = document.getElementById("classLegend");
+        const pieCtx = document.getElementById("classBreakdownChart");
+
+        if (pieCtx && classLegend) {
+            const hasClassData = Object.keys(countsByClass).length > 0;
+
+            const classNames = hasClassData ? Object.keys(countsByClass) : ["No Data"];
+            const classCounts = hasClassData ? Object.values(countsByClass) : [1];
+            const totalCount = classCounts.reduce((sum, value) => sum + value, 0);
+            const backgroundColors = classNames.map(name => getClassColor(name));
+
+            if (hasClassData) {
+                classLegend.innerHTML = classNames.map((className) => `
+                  <div class="pie-side-legend-item" data-class-name="${className}">
+                    <div class="pie-side-legend-left">
+                      <span class="legend-dot" style="background-color: ${getClassColor(className)};"></span>
+                      <span class="legend-label">${className}</span>
+                    </div>
+                    <span class="legend-value">${countsByClass[className]}</span>
+                  </div>
+               `).join("");
+            } else {
+                classLegend.innerHTML = `<div class="legend-empty">Class counts will appear here after processing.</div>`;
+            }
+
+            new Chart(pieCtx, {
+                type: "pie",
+                data: {
+                    labels: classNames,
+                    datasets: [{
+                        data: classCounts,
+                        backgroundColor: backgroundColors,
+                        borderColor: "#ffffff",
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: 8
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        datalabels: {
+                            color: "#ffffff",
+                            font: {
+                                weight: "700",
+                                size: 12
+                            },
+                            formatter: (value) => {
+                                if (!hasClassData || !totalCount) return "";
+                                const pct = Math.round((value / totalCount) * 100);
+                                return pct > 0 ? `${pct}%` : "";
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        const aiChatDock = document.getElementById("aiChatDock");
+        const aiChatDockBody = document.getElementById("aiChatDockBody");
+        const aiChatDockToggleButton = document.getElementById("aiChatDockToggleButton");
+        const chatMessages = document.getElementById("chatMessages");
+        const jobChatForm = document.getElementById("jobChatForm");
+        const jobChatInput = document.getElementById("jobChatInput");
+        const jobChatSendButton = document.getElementById("jobChatSendButton");
+        const dashboardMain = document.querySelector(".dashboard-main");
+
+        let hasChatInteraction = false;
+        let isChatMessagesCollapsed = false;
+        let hasGeneratedChatResponse = false;
+
+        function syncBottomScrollSpaceForChatDock() {
+            if (!aiChatDock || !dashboardMain) return;
+
+            const dockHeight = aiChatDock.offsetHeight || 0;
+            const extraBuffer = 32;
+            dashboardMain.style.paddingBottom = `${dockHeight + extraBuffer}px`;
+        }
+
+        function updateChatDockToggleVisibility() {
+            if (!aiChatDockToggleButton) return;
+            aiChatDockToggleButton.style.display = hasChatInteraction ? "inline-flex" : "none";
+        }
+
+        function updateChatMessagesCollapsedState() {
+            if (!chatMessages || !aiChatDockToggleButton) return;
+
+            if (isChatMessagesCollapsed) {
+                chatMessages.style.display = "none";
+                aiChatDockToggleButton.textContent = "˄";
+                aiChatDockToggleButton.setAttribute("aria-label", "Expand chat");
+                aiChatDockToggleButton.setAttribute("title", "Expand chat");
+            } else {
+                chatMessages.style.display = "";
+                aiChatDockToggleButton.textContent = "⌄";
+                aiChatDockToggleButton.setAttribute("aria-label", "Collapse chat");
+                aiChatDockToggleButton.setAttribute("title", "Collapse chat");
+            }
+
+            syncBottomScrollSpaceForChatDock();
+        }
+
+        function markChatInteractionStarted() {
+            if (hasChatInteraction) return;
+            hasChatInteraction = true;
+            updateChatDockToggleVisibility();
+            syncBottomScrollSpaceForChatDock();
+        }
+
+        function syncChatPlaceholder() {
+            if (!jobChatInput) return;
+
+            if (hasGeneratedChatResponse) {
+                jobChatInput.placeholder = "";
+            } else {
+                jobChatInput.placeholder = "Ask me about peak periods, dominant vehicle classes, traffic patterns, anomalies, or limits of inference from this video";
+            }
+        }
+
+        aiChatDockToggleButton?.addEventListener("mouseenter", () => {
+            aiChatDockToggleButton.style.background = "linear-gradient(180deg, rgba(219,234,254,0.98) 0%, rgba(191,219,254,0.98) 100%)";
+            aiChatDockToggleButton.style.color = "#1d4ed8";
+            aiChatDockToggleButton.style.transform = "translateY(-1px)";
+            aiChatDockToggleButton.style.boxShadow = "0 10px 22px rgba(37,99,235,0.16), inset 0 0 0 1px rgba(59,130,246,0.18)";
+        });
+
+        aiChatDockToggleButton?.addEventListener("mouseleave", () => {
+            aiChatDockToggleButton.style.background = "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)";
+            aiChatDockToggleButton.style.color = "#0f172a";
+            aiChatDockToggleButton.style.transform = "translateY(0)";
+            aiChatDockToggleButton.style.boxShadow = "0 6px 18px rgba(15,23,42,0.10), inset 0 0 0 1px rgba(148,163,184,0.22)";
+        });
+
+        aiChatDockToggleButton?.addEventListener("click", () => {
+            isChatMessagesCollapsed = !isChatMessagesCollapsed;
+            updateChatMessagesCollapsedState();
+        });
+
+        updateChatDockToggleVisibility();
+        updateChatMessagesCollapsedState();
+        syncChatPlaceholder();
+        syncBottomScrollSpaceForChatDock();
+        window.addEventListener("resize", syncBottomScrollSpaceForChatDock);
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function renderAssistantMessageHtml(text) {
+            const safe = escapeHtml(text);
+
+            const lines = safe.split("\n");
+            let html = "";
+            let inList = false;
+
+            function closeListIfOpen() {
+                if (inList) {
+                    html += "</ul>";
+                    inList = false;
+                }
+            }
+
+            for (const rawLine of lines) {
+                const line = rawLine.trim();
+
+                if (!line) {
+                    closeListIfOpen();
+                    html += '<div class="ai-chat-spacer"></div>';
+                    continue;
+                }
+
+                if (line.startsWith("* ") || line.startsWith("- ")) {
+                    if (!inList) {
+                        html += '<ul class="ai-chat-list">';
+                        inList = true;
+                    }
+
+                    const itemText = line.slice(2)
+                        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+                    html += `<li>${itemText}</li>`;
+                    continue;
+                }
+
+                closeListIfOpen();
+
+                const paragraphText = line
+                    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+                html += `<p>${paragraphText}</p>`;
+            }
+
+            closeListIfOpen();
+            return html || "<p>No response.</p>";
+        }
+
+        function inferAssistantEvidenceType(text) {
+            const normalized = String(text || "").toLowerCase();
+
+            const computedSignals = [
+                "crossing events",
+                "crossing timestamps",
+                "timestamp",
+                "peak traffic period",
+                "busiest period",
+                "highest concentration",
+                "dominated the peak",
+                "vehicle class",
+                "motorcycles dominated",
+                "accounted for",
+                "total vehicles",
+                "crossings",
+                "event data",
+                "computed from",
+                "between approximately",
+                "seconds"
+            ];
+
+            const visualSignals = [
+                "based on visual inference",
+                "based on visual cues",
+                "visual cues",
+                "visually",
+                "scene cues",
+                "roadside stalls",
+                "shops",
+                "urban environment",
+                "green foliage",
+                "right-hand traffic",
+                "left-hand traffic",
+                "possible region",
+                "possible country",
+                "might be from",
+                "could be from",
+                "hypothesis",
+                "not verified",
+                "explicit metadata",
+                "explicit signage",
+                "location metadata"
+            ];
+
+            const matchedComputed = computedSignals.some((signal) => normalized.includes(signal));
+            if (matchedComputed) {
+                return {
+                    label: "Computed from events",
+                    kind: "computed"
+                };
+            }
+
+            const matchedVisual = visualSignals.some((signal) => normalized.includes(signal));
+            if (matchedVisual) {
+                return {
+                    label: "Visual inference",
+                    kind: "visual"
+                };
+            }
+
+            return {
+                label: "Computed from events",
+                kind: "computed"
+            };
+        }
+
+        function appendChatMessage(role, text, evidenceMeta = null) {
+            if (!chatMessages) return;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = `ai-chat-message ai-chat-message-${role}`;
+
+            const bubble = document.createElement("div");
+            bubble.className = "ai-chat-bubble";
+
+            if (role === "assistant") {
+                markChatInteractionStarted();
+                isChatMessagesCollapsed = false;
+                updateChatMessagesCollapsedState();
+
+                hasGeneratedChatResponse = true;
+                syncChatPlaceholder();
+
+                const evidence =
+                    evidenceMeta && evidenceMeta.kind && evidenceMeta.label
+                        ? evidenceMeta
+                        : inferAssistantEvidenceType(text);
+
+                const content = document.createElement("div");
+                content.className = "ai-chat-bubble-content";
+                content.innerHTML = renderAssistantMessageHtml(text);
+
+                const badge = document.createElement("div");
+                badge.className = `ai-chat-inline-label ai-chat-inline-label-${evidence.kind}`;
+                badge.textContent = evidence.label;
+
+                bubble.appendChild(content);
+                bubble.appendChild(badge);
+            } else {
+                bubble.textContent = text;
+            }
+
+            wrapper.appendChild(bubble);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            syncBottomScrollSpaceForChatDock();
+        }
+
+        function setChatLoadingState(isLoading) {
+            if (jobChatInput) {
+                jobChatInput.disabled = isLoading;
+            }
+
+            if (jobChatSendButton) {
+                jobChatSendButton.disabled = isLoading;
+                jobChatSendButton.innerHTML = isLoading ? "…" : "➤";
+                jobChatSendButton.setAttribute(
+                    "aria-label",
+                    isLoading ? "Thinking" : "Send message"
+                );
+            }
+        }
+
+        jobChatForm?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const message = String(jobChatInput?.value || "").trim();
+            if (!message) return;
+
+            markChatInteractionStarted();
+            appendChatMessage("user", message);
+            jobChatInput.value = "";
+            setChatLoadingState(true);
+
+            try {
+                const response = await fetch(`/api/jobs/${currentJobId}/chat`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.ok) {
+                    appendChatMessage(
+                        "assistant",
+                        data?.error || "Something went wrong while contacting the AI analyst."
+                    );
+                    return;
+                }
+
+                const backendEvidence =
+                    data.evidence === "visual"
+                        ? { label: "Visual inference", kind: "visual" }
+                        : { label: "Computed from events", kind: "computed" };
+
+                appendChatMessage(
+                    "assistant",
+                    data.answer || "I could not generate a response for this result.",
+                    backendEvidence
+                );
+            } catch (error) {
+                appendChatMessage(
+                    "assistant",
+                    "Network error while contacting the AI analyst."
+                );
+            } finally {
+                setChatLoadingState(false);
+                jobChatInput?.focus();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TrafficVision AI · Vehicle Volume Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='progress-overlay.css') }}">
+</head>
+<body class="landing-page">
+    <div class="preprocess-shell">
+        <header class="preprocess-header">
+            <a href="/" class="brand-block brand-link">
+                <div class="brand-icon">🚦</div>
+                <div>
+                    <div class="brand-name">TrafficVision AI</div>
+                    <div class="brand-subtitle">Vehicle Volume Analyzer</div>
+                </div>
+            </a>
+        </header>
+
+        <main class="preprocess-main">
+            <section class="hero-card" id="uploadHero">
+                <div class="hero-badge">Built for real traffic analytics</div>
+
+                <h1 class="hero-title">
+                    Analyze traffic videos, set the counting line, and process only when ready
+                </h1>
+
+                <p class="hero-description">
+                    Upload a road traffic video, preview it locally in the browser, adjust the counting line,
+                    and then send the video for backend processing. This keeps setup fast and matches the actual
+                    analyzer workflow better.
+                </p>
+
+                <div class="hero-actions">
+                    <button type="button" class="primary-upload-btn" id="uploadTrigger">
+                        Upload Video
+                    </button>
+                    <p class="hero-helper">
+                        New flow: upload → local preview → adjust line → process → analytics
+                    </p>
+                </div>
+            </section>
+
+            <section class="preprocess-dashboard hidden" id="preprocessDashboard">
+                <aside class="preprocess-sidebar">
+                    <div class="preprocess-sidebar-title">Analyzer</div>
+                    <div class="preprocess-sidebar-item active">Setup</div>
+                    <div class="preprocess-sidebar-item muted">Processed Preview</div>
+                    <div class="preprocess-sidebar-item muted">Analytics</div>
+                    <div class="preprocess-sidebar-item muted">Event Log</div>
+                </aside>
+
+                <section class="preprocess-content">
+                    <div class="preprocess-topbar">
+                        <div>
+                            <h1 class="preprocess-page-title">Vehicle Volume Analyzer</h1>
+                            <p class="preprocess-page-subtitle">
+                                Preview locally, adjust the counting line, and process when ready.
+                            </p>
+                        </div>
+
+                        <div class="preprocess-topbar-actions">
+                            <button type="button" class="secondary-btn" id="changeVideoButton">
+                                Change Video
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preprocess-grid">
+                        <article class="panel-card">
+                            <div class="panel-header">
+                                <h2>1. Setup & Preview</h2>
+                                <span class="panel-status-badge">Local preview</span>
+                            </div>
+
+                            <div class="video-panel input-video-panel" id="inputVideoPanel">
+                                <video
+                                    class="dashboard-video hidden"
+                                    id="inputPreviewVideo"
+                                    controls
+                                    preload="metadata"
+                                    playsinline
+                                ></video>
+
+                                <div class="video-empty-state" id="inputPreviewEmpty">
+                                    Select a video to preview it here.
+                                </div>
+
+                                <div class="line-editor-overlay hidden" id="lineEditorOverlay">
+                                    <div class="draggable-count-line" id="draggableCountLine"></div>
+                                    <div class="draggable-line-badge" id="draggableLineBadge">
+                                        line_frac: <span id="lineFracValue">0.75</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="panel-footer panel-footer-stack">
+                                <div class="line-editor-controls">
+                                    <p class="helper-text">
+                                        Drag the red line vertically to choose where vehicle crossings should be counted.
+                                    </p>
+
+                                    <div class="line-editor-meta">
+                                        <span class="line-editor-pill">Editable line</span>
+                                        <span class="line-editor-pill">Live line_frac</span>
+                                        <span class="line-editor-pill">Direction: Southbound</span>
+                                    </div>
+                                </div>
+
+                                <form
+                                    action="/process"
+                                    method="post"
+                                    enctype="multipart/form-data"
+                                    class="process-inline-form"
+                                    id="processForm"
+                                >
+                                    <input
+                                        id="videoInput"
+                                        type="file"
+                                        name="video"
+                                        accept="video/*"
+                                        hidden
+                                        required
+                                    >
+                                    <input
+                                        type="hidden"
+                                        name="line_frac"
+                                        id="processLineFracInput"
+                                        value="0.75"
+                                    >
+                                    <input
+                                        type="hidden"
+                                        name="direction"
+                                        id="processDirectionInput"
+                                        value="top_to_bottom"
+                                    >
+
+                                    <button type="button" class="primary-btn" id="processVideoButton" disabled>
+                                        Process Video
+                                    </button>
+                                </form>
+                            </div>
+                        </article>
+
+                        <article class="panel-card">
+                            <div class="panel-header">
+                                <h2>2. Processing Output</h2>
+                                <span class="panel-status-badge muted">Available after processing</span>
+                            </div>
+
+                            <div class="video-panel preview-placeholder-panel">
+                                <div class="video-empty-state">
+                                    Annotated output preview will appear after backend processing completes.
+                                </div>
+                            </div>
+
+                            <div class="status-row">
+                                <span>Status: <strong>Not started</strong></span>
+                                <span>Total Counted: <strong>—</strong></span>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="preprocess-grid lower-grid">
+                        <article class="panel-card">
+                            <div class="panel-header">
+                                <h2>Volume Timeline</h2>
+                                <span class="panel-status-badge muted">Generated after processing</span>
+                            </div>
+                            <div class="chart-placeholder">
+                                Timeline analytics will appear after processing the selected video.
+                            </div>
+                        </article>
+
+                        <article class="panel-card">
+                            <div class="panel-header">
+                                <h2>Class Breakdown</h2>
+                                <span class="panel-status-badge muted">Generated after processing</span>
+                            </div>
+                            <div class="chart-placeholder">
+                                Class distribution and percentages will appear here after processing.
+                            </div>
+                        </article>
+                    </div>
+
+                    <article class="panel-card">
+                        <div class="panel-header">
+                            <h2>Event Log & Data Breakdown</h2>
+                            <span class="panel-status-badge muted">Generated after processing</span>
+                        </div>
+
+                        <div class="table-placeholder">
+                            Crossing events and CSV-ready records will appear after processing.
+                        </div>
+                    </article>
+                </section>
+            </section>
+
+            <input
+                id="hiddenUploadPicker"
+                type="file"
+                accept="video/*"
+                hidden
+            >
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', path='progress-overlay.js') }}"></script>
+
+    <script>
+        const uploadHero = document.getElementById("uploadHero");
+        const preprocessDashboard = document.getElementById("preprocessDashboard");
+
+        const uploadTrigger = document.getElementById("uploadTrigger");
+        const changeVideoButton = document.getElementById("changeVideoButton");
+
+        const hiddenUploadPicker = document.getElementById("hiddenUploadPicker");
+        const videoInput = document.getElementById("videoInput");
+        const processForm = document.getElementById("processForm");
+        const processVideoButton = document.getElementById("processVideoButton");
+
+        const inputPreviewVideo = document.getElementById("inputPreviewVideo");
+        const inputPreviewEmpty = document.getElementById("inputPreviewEmpty");
+
+        const lineEditorOverlay = document.getElementById("lineEditorOverlay");
+        const draggableCountLine = document.getElementById("draggableCountLine");
+        const draggableLineBadge = document.getElementById("draggableLineBadge");
+        const lineFracValue = document.getElementById("lineFracValue");
+        const processLineFracInput = document.getElementById("processLineFracInput");
+
+        let previewObjectUrl = null;
+        let currentLineFrac = 0.75;
+        let isDraggingLine = false;
+
+        function clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function syncLineEditor(lineFrac) {
+            const safeFrac = clamp(lineFrac, 0.05, 0.95);
+            currentLineFrac = safeFrac;
+
+            draggableCountLine.style.top = `${safeFrac * 100}%`;
+            draggableLineBadge.style.top = `${safeFrac * 100}%`;
+            lineFracValue.textContent = safeFrac.toFixed(2);
+            processLineFracInput.value = safeFrac.toFixed(2);
+        }
+
+        function showDashboardWithVideo(file) {
+            if (!file) return;
+
+            if (previewObjectUrl) {
+                URL.revokeObjectURL(previewObjectUrl);
+            }
+
+            previewObjectUrl = URL.createObjectURL(file);
+            inputPreviewVideo.src = previewObjectUrl;
+
+            uploadHero.classList.add("hidden");
+            preprocessDashboard.classList.remove("hidden");
+
+            inputPreviewVideo.classList.remove("hidden");
+            inputPreviewEmpty.classList.add("hidden");
+            lineEditorOverlay.classList.remove("hidden");
+
+            processVideoButton.disabled = false;
+            syncLineEditor(currentLineFrac);
+        }
+
+        function loadSelectedVideo(file) {
+            if (!file) return;
+
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            videoInput.files = dataTransfer.files;
+
+            showDashboardWithVideo(file);
+        }
+
+        uploadTrigger.addEventListener("click", () => {
+            hiddenUploadPicker.click();
+        });
+
+        changeVideoButton.addEventListener("click", () => {
+            hiddenUploadPicker.click();
+        });
+
+        hiddenUploadPicker.addEventListener("change", () => {
+            if (hiddenUploadPicker.files && hiddenUploadPicker.files.length > 0) {
+                loadSelectedVideo(hiddenUploadPicker.files[0]);
+            }
+        });
+
+        function updateLineFromPointer(clientY) {
+            if (!lineEditorOverlay.classList.contains("hidden")) {
+                const rect = lineEditorOverlay.getBoundingClientRect();
+                const relativeY = clientY - rect.top;
+                const frac = relativeY / rect.height;
+                syncLineEditor(frac);
+            }
+        }
+
+        draggableCountLine.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            isDraggingLine = true;
+        });
+
+        draggableLineBadge.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            isDraggingLine = true;
+        });
+
+        window.addEventListener("mousemove", (event) => {
+            if (!isDraggingLine) return;
+            updateLineFromPointer(event.clientY);
+        });
+
+        window.addEventListener("mouseup", () => {
+            isDraggingLine = false;
+        });
+
+        draggableCountLine.addEventListener("touchstart", () => {
+            isDraggingLine = true;
+        });
+
+        draggableLineBadge.addEventListener("touchstart", () => {
+            isDraggingLine = true;
+        });
+
+        window.addEventListener("touchmove", (event) => {
+            if (!isDraggingLine || !event.touches.length) return;
+            updateLineFromPointer(event.touches[0].clientY);
+        }, { passive: true });
+
+        window.addEventListener("touchend", () => {
+            isDraggingLine = false;
+        });
+
+        lineEditorOverlay.addEventListener("click", (event) => {
+            updateLineFromPointer(event.clientY);
+        });
+
+        if (typeof initProcessingOverlay === "function") {
+            initProcessingOverlay({
+                form: processForm,
+                fileInput: videoInput,
+                triggerButton: processVideoButton
+            });
+        } else {
+            console.error("progress-overlay.js did not load correctly.");
+        }
+
+        syncLineEditor(currentLineFrac);
+    </script>
+</body>
+</html>

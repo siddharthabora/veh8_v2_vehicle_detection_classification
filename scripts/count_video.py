@@ -29,7 +29,10 @@ def parse_args():
 
     parser.add_argument("--tracker_config", default="configs/tracker.yaml")
     parser.add_argument("--counter_config", default="configs/counter.yaml")
-
+    parser.add_argument("--output_csv", default="outputs/crossing_events.csv")
+    parser.add_argument("--line_frac", type=float, default=None)
+    parser.add_argument("--direction", type=str, default=None)
+    
     return parser.parse_args()
 
 
@@ -38,8 +41,6 @@ def main():
 
     tracker_cfg_yaml = load_yaml(args.tracker_config) or {}
     counter_cfg_yaml = load_yaml(args.counter_config) or {}
-
-    print(counter_cfg_yaml)
 
     model = YOLO(args.model)
 
@@ -64,16 +65,34 @@ def main():
         min_hits=int(tracker_cfg_yaml.get("min_hits", 3)),
     )
 
+    resolved_line_frac = (
+    float(args.line_frac)
+    if args.line_frac is not None
+    else float(counter_cfg_yaml.get("line_frac", 0.75))
+    )
+
+    resolved_direction = (
+    str(args.direction)
+    if args.direction is not None
+    else str(counter_cfg_yaml.get("direction", "top_to_bottom"))
+    )
+
+    print({
+    "counter_config_yaml": counter_cfg_yaml,
+    "resolved_line_frac": resolved_line_frac,
+    "resolved_direction": resolved_direction,
+    })
+
     counter_cfg = LineCounterConfig(
-        line_frac=float(counter_cfg_yaml.get("line_frac", 0.75)),
-        direction=str(counter_cfg_yaml.get("direction", "top_to_bottom")),
+    line_frac=resolved_line_frac,
+    direction=resolved_direction,
     )
 
     line = HorizontalLine.from_height(height, counter_cfg.line_frac)
 
     counter = LineCounter(tracker_cfg, counter_cfg)
 
-    logger = EventLogger()
+    logger = EventLogger(output_path=args.output_csv)
 
     cap.release()
     cap = cv2.VideoCapture(args.video)

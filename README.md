@@ -348,11 +348,3 @@ Current likely next areas:
 ## License
 
 See `LICENSE`.
-
-````
-
-Then save it and run:
-
-```bash
-python -m py_compile app/main.py
-````
